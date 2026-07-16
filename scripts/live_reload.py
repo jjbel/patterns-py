@@ -33,7 +33,9 @@ POLL_MS = 400
 INIT_GEOMETRY = "1280x760"  # starting window size; resize freely afterwards
 RESIZE_DEBOUNCE_MS = 60  # coalesce rapid resize events while dragging
 
-SCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts" / "make_l_test.py"
+SCRIPT = (
+    Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts" / "res_test_v01.py"
+)
 if not SCRIPT.is_absolute():
     SCRIPT = (
         (ROOT / "scripts" / SCRIPT).resolve()
