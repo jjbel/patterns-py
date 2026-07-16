@@ -101,26 +101,29 @@ def l_shape(line_width: int, n: int, q: int, intensity: int = 255) -> ShapeGroup
         length = q + i * lw
         y = (2 * i + 1) * lw
         shapes.append(Box(right_x, y, length + i * lw, lw, intensity))
+        # vertical line: all tops line up at (2*lw - q); grow the height down to the
+        # existing bottom (y + lw) so it still meets its horizontal segment
         shapes.append(
-            Box(right_x + length + i * lw, y - length + lw, lw, length, intensity)
+            Box(right_x + length + i * lw, 2 * lw - q, lw, y - lw + q, intensity)
         )
 
-    return ShapeGroup(shapes)
+    # normalize so the group's bbox top-left sits at the local origin (0, 0)
+    group = ShapeGroup(shapes)
+    bx, by, _, _ = group.bbox()
+    return group.translated(-bx, -by)
 
 
 def nested_ls(
     n: int, line_widths, q_factor: float = 12, intensity: int = 255
 ) -> ShapeGroup:
-    """Place one :func:`l_shape` per line width concentrically.
+    """Place one :func:`l_shape` per line width, all sharing a common (top-left) origin.
 
-    Each L shares a common bbox top-right corner before the whole group is normalized
-    back to a top-left origin.
+    Each L already has a top-left origin, so they are simply overlaid at (0, 0); larger
+    line widths give larger L's that nest around the smaller ones. Intersections between
+    L's are not checked.
     """
     out = ShapeGroup()
     for lw in line_widths:
         q = max(1, round(q_factor * lw))
-        L = l_shape(lw, n, q, intensity)
-        bx, by, bw, _ = L.bbox()
-        out.add(L.translated(-(bx + bw), -by))
-    gx, gy, _, _ = out.bbox()
-    return out.translated(-gx, -gy)
+        out.add(l_shape(lw, n, q, intensity))
+    return out

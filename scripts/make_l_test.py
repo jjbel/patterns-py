@@ -1,4 +1,4 @@
-"""Single L-shape test structure.
+"""Nested L-shape test structure.
 
 Run:  python scripts/make_l_test.py
 """
@@ -9,14 +9,14 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from lib._bootstrap import OUT
-from lib import Pattern, l_shape, write_png
+from lib import Pattern, nested_ls, write_png
 
 
 p = Pattern("l_test")
 
-# Single L made from horizontal lines only.
-L = l_shape(line_width=20, n=5, q=500)
-p.place(L, 100, 100)
+# Nested L's, one per line width, sharing a common top-left origin.
+group = nested_ls(n=5, line_widths=[4, 12, 32])
+p.place(group, 100, 100)
 
 write_png(p, OUT / "l_test_white.png", "white")
 
