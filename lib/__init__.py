@@ -10,6 +10,8 @@ from .builders import (
     plus_fiducial,
     line_array,
     checkerboard,
+    l_shape,
+    nested_ls,
 )
 from .layout import flow_layout, tile_quadrants
 from .gds import write_gds
@@ -25,6 +27,8 @@ __all__ = [
     "plus_fiducial",
     "line_array",
     "checkerboard",
+    "l_shape",
+    "nested_ls",
     "flow_layout",
     "tile_quadrants",
     "write_gds",
