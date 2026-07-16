@@ -9,7 +9,8 @@ Defaults:
     output_png  = out/res_test_white.png
 
 Edit a builder call, save, and the window updates. Errors in the script are shown in the
-window title and printed; the watcher keeps running.
+window title and printed; the watcher keeps running. The preview scales to fit the window
+(aspect-preserving, NEAREST so pixels stay crisp) -- resize the window to zoom.
 
 Stdlib + Pillow only (no watchdog). Uses mtime polling.
 """
@@ -29,7 +30,8 @@ from pathlib import Path
 from PIL import Image, ImageTk
 
 POLL_MS = 400
-MAX_VIEW = 1200  # max window dimension in px
+INIT_GEOMETRY = "1280x760"  # starting window size; resize freely afterwards
+RESIZE_DEBOUNCE_MS = 60     # coalesce rapid resize events while dragging
 
 SCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts" / "make_resolution_test.py"
 if not SCRIPT.is_absolute():
@@ -67,9 +69,40 @@ class Viewer:
         self.label = tk.Label(root, bg="#202020")
         self.label.pack(fill="both", expand=True)
         self._tk_img = None
+        self._full_img = None       # full-resolution PNG, scaled on demand to fit the window
+        self._rendered_size = None  # last (box_w, box_h) we rendered at
+        self._resize_job = None
         self._src_mtime = -1.0
         self._png_mtime = -1.0
+        self.label.bind("<Configure>", self.on_resize)
         self.tick()
+
+    def on_resize(self, event):
+        # coalesce the flood of Configure events during a drag into one render
+        if self._resize_job is not None:
+            self.root.after_cancel(self._resize_job)
+        self._resize_job = self.root.after(
+            RESIZE_DEBOUNCE_MS, lambda w=event.width, h=event.height: self.render(w, h)
+        )
+
+    def render(self, box_w=None, box_h=None):
+        """Scale the full-res image to fit within (box_w, box_h), preserving aspect."""
+        self._resize_job = None
+        if self._full_img is None:
+            return
+        if box_w is None:
+            box_w, box_h = self.label.winfo_width(), self.label.winfo_height()
+        if box_w < 2 or box_h < 2:
+            return
+        if (box_w, box_h) == self._rendered_size:
+            return
+        self._rendered_size = (box_w, box_h)
+        w, h = self._full_img.size
+        scale = min(box_w / w, box_h / h)  # fit inside the window (up- or down-scale)
+        new = (max(1, round(w * scale)), max(1, round(h * scale)))
+        img = self._full_img.resize(new, Image.NEAREST)  # NEAREST keeps pixels crisp
+        self._tk_img = ImageTk.PhotoImage(img)
+        self.label.config(image=self._tk_img)
 
     def load_png(self):
         try:
@@ -77,12 +110,9 @@ class Viewer:
             img.load()
         except (FileNotFoundError, OSError):
             return
-        w, h = img.size
-        scale = MAX_VIEW / max(w, h)
-        if scale < 1:
-            img = img.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.NEAREST)
-        self._tk_img = ImageTk.PhotoImage(img)
-        self.label.config(image=self._tk_img)
+        self._full_img = img
+        self._rendered_size = None  # force a re-fit even if the window size is unchanged
+        self.render()
 
     def tick(self):
         src = latest_source_mtime()
@@ -111,6 +141,7 @@ class Viewer:
 def main():
     root = tk.Tk()
     root.title("live-reload")
+    root.geometry(INIT_GEOMETRY)
     root.configure(bg="#202020")
     Viewer(root)
     root.mainloop()
