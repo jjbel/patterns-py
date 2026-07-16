@@ -31,12 +31,16 @@ from PIL import Image, ImageTk
 
 POLL_MS = 400
 INIT_GEOMETRY = "1280x760"  # starting window size; resize freely afterwards
-RESIZE_DEBOUNCE_MS = 60     # coalesce rapid resize events while dragging
+RESIZE_DEBOUNCE_MS = 60  # coalesce rapid resize events while dragging
 
-SCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts" / "make_resolution_test.py"
+SCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts" / "make_l_test.py"
 if not SCRIPT.is_absolute():
-    SCRIPT = (ROOT / "scripts" / SCRIPT).resolve() if not SCRIPT.exists() else SCRIPT.resolve()
-OUT_PNG = Path(sys.argv[2]) if len(sys.argv) > 2 else OUT / "res_test_white.png"
+    SCRIPT = (
+        (ROOT / "scripts" / SCRIPT).resolve()
+        if not SCRIPT.exists()
+        else SCRIPT.resolve()
+    )
+OUT_PNG = Path(sys.argv[2]) if len(sys.argv) > 2 else OUT / "l_test_white.png"
 
 
 def watched_files():
@@ -69,7 +73,7 @@ class Viewer:
         self.label = tk.Label(root, bg="#202020")
         self.label.pack(fill="both", expand=True)
         self._tk_img = None
-        self._full_img = None       # full-resolution PNG, scaled on demand to fit the window
+        self._full_img = None  # full-resolution PNG, scaled on demand to fit the window
         self._rendered_size = None  # last (box_w, box_h) we rendered at
         self._resize_job = None
         self._src_mtime = -1.0
@@ -111,7 +115,9 @@ class Viewer:
         except (FileNotFoundError, OSError):
             return
         self._full_img = img
-        self._rendered_size = None  # force a re-fit even if the window size is unchanged
+        self._rendered_size = (
+            None  # force a re-fit even if the window size is unchanged
+        )
         self.render()
 
     def tick(self):
@@ -123,10 +129,14 @@ class Viewer:
             ok, message = run_script()
             stamp = time.strftime("%H:%M:%S")
             if ok:
-                self.root.title(f"live-reload: {SCRIPT.name} -> {OUT_PNG.name}  ({stamp})")
+                self.root.title(
+                    f"live-reload: {SCRIPT.name} -> {OUT_PNG.name}  ({stamp})"
+                )
             else:
                 self.root.title(f"live-reload: ERROR {message}  ({stamp})")
-                print(f"[{stamp}] error running {SCRIPT.name}: {message}", file=sys.stderr)
+                print(
+                    f"[{stamp}] error running {SCRIPT.name}: {message}", file=sys.stderr
+                )
 
         # refresh the view if the PNG changed on disk
         if OUT_PNG.exists():

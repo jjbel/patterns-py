@@ -5,7 +5,9 @@ from __future__ import annotations
 from .scene import ShapeGroup
 
 
-def flow_layout(groups, max_width: int, gap: int = 24, sort_by_height: bool = True) -> ShapeGroup:
+def flow_layout(
+    groups, max_width: int, gap: int = 24, sort_by_height: bool = True
+) -> ShapeGroup:
     """Shelf-pack ``groups`` left->right, wrapping to a new row (shelf) at ``max_width``.
 
     With ``sort_by_height`` the groups are placed tallest-first, which keeps each shelf
@@ -23,6 +25,8 @@ def flow_layout(groups, max_width: int, gap: int = 24, sort_by_height: bool = Tr
     row_h = 0
     for g in items:
         gx, gy, gw, gh = g.bbox()
+        if gw > max_width:
+            raise ValueError(f"group width {gw} exceeds max_width {max_width}")
         if x > 0 and x + gw > max_width:
             # wrap to next shelf
             x = 0
@@ -43,6 +47,14 @@ def tile_quadrants(pattern, block: ShapeGroup, margin: int = 0) -> None:
     """
     hw = pattern.width_px // 2
     hh = pattern.height_px // 2
+    bx, by, bw, bh = block.bbox()
+    max_w = hw - margin
+    max_h = hh - margin
+    if bw > max_w or bh > max_h:
+        raise ValueError(
+            f"block bbox {bw} x {bh} does not fit within quadrant {max_w} x {max_h} "
+            f"after applying margin {margin}"
+        )
     for ox in (0, hw):
         for oy in (0, hh):
             pattern.place(block, ox + margin, oy + margin)
