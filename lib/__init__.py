@@ -13,6 +13,7 @@ from .builders import (
     l_shape,
     nested_ls,
 )
+from .text import text
 from .layout import flow_layout, tile_quadrants
 from .gds import write_gds
 from .raster import render_intensity, render_rgb, write_png, COLORS
@@ -29,6 +30,7 @@ __all__ = [
     "checkerboard",
     "l_shape",
     "nested_ls",
+    "text",
     "flow_layout",
     "tile_quadrants",
     "write_gds",

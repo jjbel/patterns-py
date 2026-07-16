@@ -15,7 +15,7 @@ from lib import Pattern, nested_ls, write_png
 p = Pattern("l_test")
 
 # Nested L's, one per line width, sharing a common top-left origin.
-group = nested_ls(n=5, line_widths=[4, 12, 32])
+group = nested_ls(n=5, line_widths=[4, 16, 35])
 p.place(group, 100, 100)
 
 write_png(p, OUT / "l_test_white.png", "white")

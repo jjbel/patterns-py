@@ -6,7 +6,10 @@ All dimensions are in integer pixels unless they come from ``Pattern.um(...)``.
 
 from __future__ import annotations
 
-from .scene import Box, ShapeGroup
+from .scene import Box, ShapeGroup, DEFAULT_FIELD_UM, DEFAULT_WIDTH_PX
+from .text import text
+
+_DEFAULT_UM_PER_PX = DEFAULT_FIELD_UM / DEFAULT_WIDTH_PX
 
 
 def box(w: int, h: int, intensity: int = 255) -> ShapeGroup:
@@ -77,12 +80,25 @@ def checkerboard(
     return ShapeGroup(shapes)
 
 
-def l_shape(line_width: int, n: int, q: int, intensity: int = 255) -> ShapeGroup:
+def l_shape(
+    line_width: int,
+    n: int,
+    q: int,
+    um_per_px: float = _DEFAULT_UM_PER_PX,
+    min_font_scale: int = 3,
+    label: bool = True,
+    intensity: int = 255,
+) -> ShapeGroup:
     """``n`` horizontal lines of length ``q`` with a checkerboard block on the right.
 
     The checkerboard has side length ``2n - 1`` squares, with filled squares touching
     the horizontal lines exactly. ``n - 1`` additional stepped L-shapes extend rightward
     from the checkerboard edge and sit on the checkerboard gaps.
+
+    When ``label`` is true, the line width is converted to microns
+    (``line_width * um_per_px``) and drawn to 2 decimal places to the left of the L,
+    vertically centered on the horizontal arm. The label's font scale tracks ``line_width``
+    but never drops below ``min_font_scale`` (so small L's stay legible).
     """
     lw = int(line_width)
     if lw < 1:
@@ -97,15 +113,24 @@ def l_shape(line_width: int, n: int, q: int, intensity: int = 255) -> ShapeGroup
     shapes.extend(shape.translated(board_x, 0) for shape in board.shapes)
 
     right_x = board_x + (2 * n - 1) * lw
+    stem_len = round(1.5 * q)  # vertical stems are 1.5x the base length q
     for i in range(max(0, n - 1)):
         length = q + i * lw
         y = (2 * i + 1) * lw
         shapes.append(Box(right_x, y, length + i * lw, lw, intensity))
-        # vertical line: all tops line up at (2*lw - q); grow the height down to the
-        # existing bottom (y + lw) so it still meets its horizontal segment
+        # vertical line: all tops line up at (2*lw - stem_len); grow the height down to
+        # the existing bottom (y + lw) so it still meets its horizontal segment
         shapes.append(
-            Box(right_x + length + i * lw, 2 * lw - q, lw, y - lw + q, intensity)
+            Box(right_x + length + i * lw, 2 * lw - stem_len, lw, y - lw + stem_len, intensity)
         )
+
+    if label:
+        # micron value of the line width, to 2 decimal places
+        lbl = text(f"{lw * um_per_px:.2f}", scale=max(lw, int(min_font_scale)), intensity=intensity)
+        _, _, lbl_w, lbl_h = lbl.bbox()
+        gap = 2 * max(lw, int(min_font_scale))
+        arm_center = (2 * n - 1) * lw // 2  # vertical center of the horizontal arm block
+        shapes.extend(lbl.translated(-gap - lbl_w, arm_center - lbl_h // 2).shapes)
 
     # normalize so the group's bbox top-left sits at the local origin (0, 0)
     group = ShapeGroup(shapes)
@@ -114,16 +139,22 @@ def l_shape(line_width: int, n: int, q: int, intensity: int = 255) -> ShapeGroup
 
 
 def nested_ls(
-    n: int, line_widths, q_factor: float = 12, intensity: int = 255
+    n: int,
+    line_widths,
+    q_factor: float = 12,
+    um_per_px: float = _DEFAULT_UM_PER_PX,
+    min_font_scale: int = 3,
+    label: bool = True,
+    intensity: int = 255,
 ) -> ShapeGroup:
     """Place one :func:`l_shape` per line width, all sharing a common (top-left) origin.
 
     Each L already has a top-left origin, so they are simply overlaid at (0, 0); larger
     line widths give larger L's that nest around the smaller ones. Intersections between
-    L's are not checked.
+    L's are not checked. Labels (see :func:`l_shape`) form a column on the left.
     """
     out = ShapeGroup()
     for lw in line_widths:
         q = max(1, round(q_factor * lw))
-        out.add(l_shape(lw, n, q, intensity))
+        out.add(l_shape(lw, n, q, um_per_px, min_font_scale, label, intensity))
     return out
