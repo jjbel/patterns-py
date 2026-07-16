@@ -1,0 +1,120 @@
+"""Live-reload preview: watch the source files, re-run a generation script whenever they
+change, and show the resulting PNG in a window that refreshes automatically.
+
+Usage:
+    python scripts/live_reload.py [script] [output_png]
+
+Defaults:
+    script      = make_resolution_test.py   (resolved inside scripts/)
+    output_png  = out/res_test_white.png
+
+Edit a builder call, save, and the window updates. Errors in the script are shown in the
+window title and printed; the watcher keeps running.
+
+Stdlib + Pillow only (no watchdog). Uses mtime polling.
+"""
+
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from lib._bootstrap import ROOT, OUT
+
+import subprocess
+import time
+import tkinter as tk
+from pathlib import Path
+
+from PIL import Image, ImageTk
+
+POLL_MS = 400
+MAX_VIEW = 1200  # max window dimension in px
+
+SCRIPT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts" / "make_resolution_test.py"
+if not SCRIPT.is_absolute():
+    SCRIPT = (ROOT / "scripts" / SCRIPT).resolve() if not SCRIPT.exists() else SCRIPT.resolve()
+OUT_PNG = Path(sys.argv[2]) if len(sys.argv) > 2 else OUT / "res_test_white.png"
+
+
+def watched_files():
+    files = list((ROOT / "lib").glob("*.py"))
+    files.append(SCRIPT)
+    return files
+
+
+def latest_source_mtime():
+    return max((f.stat().st_mtime for f in watched_files() if f.exists()), default=0.0)
+
+
+def run_script():
+    """Run the generation script in a fresh subprocess. Returns (ok, message)."""
+    proc = subprocess.run(
+        [sys.executable, str(SCRIPT)],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        return True, "ok"
+    msg = (proc.stderr or proc.stdout).strip().splitlines()
+    return False, (msg[-1] if msg else "failed")
+
+
+class Viewer:
+    def __init__(self, root):
+        self.root = root
+        self.label = tk.Label(root, bg="#202020")
+        self.label.pack(fill="both", expand=True)
+        self._tk_img = None
+        self._src_mtime = -1.0
+        self._png_mtime = -1.0
+        self.tick()
+
+    def load_png(self):
+        try:
+            img = Image.open(OUT_PNG)
+            img.load()
+        except (FileNotFoundError, OSError):
+            return
+        w, h = img.size
+        scale = MAX_VIEW / max(w, h)
+        if scale < 1:
+            img = img.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.NEAREST)
+        self._tk_img = ImageTk.PhotoImage(img)
+        self.label.config(image=self._tk_img)
+
+    def tick(self):
+        src = latest_source_mtime()
+        if src > self._src_mtime:
+            self._src_mtime = src
+            self.root.title(f"live-reload: running {SCRIPT.name} ...")
+            self.root.update_idletasks()
+            ok, message = run_script()
+            stamp = time.strftime("%H:%M:%S")
+            if ok:
+                self.root.title(f"live-reload: {SCRIPT.name} -> {OUT_PNG.name}  ({stamp})")
+            else:
+                self.root.title(f"live-reload: ERROR {message}  ({stamp})")
+                print(f"[{stamp}] error running {SCRIPT.name}: {message}", file=sys.stderr)
+
+        # refresh the view if the PNG changed on disk
+        if OUT_PNG.exists():
+            m = OUT_PNG.stat().st_mtime
+            if m > self._png_mtime:
+                self._png_mtime = m
+                self.load_png()
+
+        self.root.after(POLL_MS, self.tick)
+
+
+def main():
+    root = tk.Tk()
+    root.title("live-reload")
+    root.configure(bg="#202020")
+    Viewer(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
