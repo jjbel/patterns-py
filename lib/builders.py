@@ -6,7 +6,9 @@ All dimensions are in integer pixels unless they come from ``Pattern.um(...)``.
 
 from __future__ import annotations
 
-from .scene import Box, ShapeGroup, DEFAULT_FIELD_UM, DEFAULT_WIDTH_PX
+import math
+
+from .scene import Box, Polygon, ShapeGroup, DEFAULT_FIELD_UM, DEFAULT_WIDTH_PX
 from .text import text
 
 _DEFAULT_UM_PER_PX = DEFAULT_FIELD_UM / DEFAULT_WIDTH_PX
@@ -157,4 +159,49 @@ def nested_ls(
     for lw in line_widths:
         q = max(1, round(q_factor * lw))
         out.add(l_shape(lw, n, q, um_per_px, min_font_scale, label, intensity))
+    return out
+
+
+def circle(
+    diameter: int, n_segments: int | None = None, intensity: int = 255
+) -> ShapeGroup:
+    """A filled circle of ``diameter`` px, approximated as a regular polygon.
+
+    Top-left of its bbox sits at the local origin, matching the other builders. The
+    default segment count holds the chord (flat-edge) error under half a pixel:
+    error ~= r * (pi/n)^2 / 2, so n ~= pi * sqrt(r) is the break-even point.
+    """
+    if diameter < 1:
+        raise ValueError("diameter must be >= 1 px")
+    r = diameter / 2
+    if n_segments is None:
+        n_segments = max(32, math.ceil(math.pi * math.sqrt(r)))
+    pts = [
+        (
+            round(r + r * math.cos(2 * math.pi * i / n_segments)),
+            round(r + r * math.sin(2 * math.pi * i / n_segments)),
+        )
+        for i in range(n_segments)
+    ]
+    return ShapeGroup([Polygon(pts, intensity)])
+
+
+def circle_grid(
+    diameter: int,
+    n: int = 3,
+    pitch_factor: float = 4,
+    intensity: int = 255,
+) -> ShapeGroup:
+    """An ``n`` x ``n`` square grid of circles.
+
+    ``pitch_factor`` follows :func:`line_array`'s convention: the edge-to-edge gap is
+    ``pitch_factor * diameter``, so the centre-to-centre period is
+    ``diameter * (1 + pitch_factor)``.
+    """
+    d = int(diameter)
+    step = d + round(pitch_factor * d)
+    out = ShapeGroup()
+    for i in range(n):
+        for j in range(n):
+            out.add(circle(d, intensity=intensity).translated(i * step, j * step))
     return out

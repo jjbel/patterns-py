@@ -12,6 +12,8 @@ from .builders import (
     checkerboard,
     l_shape,
     nested_ls,
+    circle,
+    circle_grid,
 )
 from .text import text
 from .layout import flow_layout, tile_quadrants
@@ -30,6 +32,8 @@ __all__ = [
     "checkerboard",
     "l_shape",
     "nested_ls",
+    "circle",
+    "circle_grid",
     "text",
     "flow_layout",
     "tile_quadrants",

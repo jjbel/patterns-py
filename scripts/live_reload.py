@@ -34,7 +34,7 @@ INIT_GEOMETRY = "1280x760"  # starting window size; resize freely afterwards
 RESIZE_DEBOUNCE_MS = 60  # coalesce rapid resize events while dragging
 
 SCRIPT = (
-    Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts" / "res_test_v01.py"
+    Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "scripts" / "laser_driller_pattern.py"
 )
 if not SCRIPT.is_absolute():
     SCRIPT = (
