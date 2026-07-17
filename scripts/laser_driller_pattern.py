@@ -42,7 +42,7 @@ from lib import (
 PX_PER_UM = 10  # projection scale for the mask: 10 px : 1 um
 PREVIEW_PX_PER_UM = 0.4  # scale for the eyeball PNG only (see OUTPUT above)
 
-ARRAY_WIDTHS_UM = (25, 50, 100)  # line-array line widths
+ARRAY_WIDTHS_UM = (25, 50)  # line-array line widths
 PITCH_FACTORS = (2, 4)  # line gap = pitch_factor x line_width (edge-to-edge)
 N_LINES = 5  # lines per array
 LINE_LEN_UM = 500  # long dimension of every line
@@ -163,12 +163,18 @@ def build(scale: float) -> Pattern:
 
 
 mask = build(PX_PER_UM)
+geom = ShapeGroup(mask.shapes)  # wrap so the new diagonal()/area() helpers are usable
+diag_um = geom.diagonal() / PX_PER_UM
+area_um2 = geom.area() / PX_PER_UM**2  # px -> um^2 (divide by px/um squared)
+fill = geom.area() / (mask.width_px * mask.height_px)  # exposed fraction of the canvas
 print(
     f"mask:    {mask.width_px} x {mask.height_px} px  "
     f"({mask.width_px / PX_PER_UM:g} x {mask.height_px / PX_PER_UM:g} um)  "
     f"= {mask.width_px * mask.height_px / 1e9:.2f} Gpx"
 )
 print(f"shapes:  {len(mask.shapes)}")
+print(f"diag:    {diag_um:.0f} um  ({diag_um / 1000:.2f} mm)")
+print(f"feature: {area_um2 / 1e6:.3f} mm^2 exposed  ({fill:.2%} fill)")
 write_gds(mask, OUT / "laser_driller_pattern.gds")
 
 # preview only -- a full-scale PNG is not writable (see OUTPUT in the module docstring)

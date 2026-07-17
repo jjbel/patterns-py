@@ -11,6 +11,7 @@ and raster outputs can never disagree.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, replace
 
 # Fixed projection scale: the full 3840 px DMD width spans 1100 um on the wafer.
@@ -35,6 +36,10 @@ class Box:
     def bbox(self) -> tuple[int, int, int, int]:
         return (self.x, self.y, self.w, self.h)
 
+    def area(self) -> float:
+        """Filled area in square pixels."""
+        return float(self.w * self.h)
+
 
 @dataclass
 class Polygon:
@@ -50,6 +55,18 @@ class Polygon:
         xs = [p[0] for p in self.points]
         ys = [p[1] for p in self.points]
         return (min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys))
+
+    def area(self) -> float:
+        """Filled area in square pixels via the shoelace formula.
+
+        Sign-independent, so winding order does not matter. Assumes a simple
+        (non-self-intersecting) polygon; self-crossing outlines are not meaningful here.
+        """
+        pts = self.points
+        s = 0.0
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1]):
+            s += x0 * y1 - x1 * y0
+        return abs(s) / 2.0
 
 
 @dataclass
@@ -82,6 +99,19 @@ class ShapeGroup:
         x1 = max(b[0] + b[2] for b in boxes)
         y1 = max(b[1] + b[3] for b in boxes)
         return (x0, y0, x1 - x0, y1 - y0)
+
+    def diagonal(self) -> float:
+        """Length of the bounding-box diagonal in pixels."""
+        _, _, w, h = self.bbox()
+        return math.hypot(w, h)
+
+    def area(self) -> float:
+        """Total filled area in square pixels: the sum over all shapes.
+
+        Overlaps are counted once per shape (double-counted where shapes intersect);
+        this assumes the shapes do not overlap.
+        """
+        return sum(s.area() for s in self.shapes)
 
 
 class Pattern:
