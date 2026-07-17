@@ -33,6 +33,7 @@ from lib._bootstrap import OUT
 from lib import (
     Pattern,
     ShapeGroup,
+    box,
     line_array,
     circle_grid,
     plus_fiducial,
@@ -62,11 +63,15 @@ CIRCLE_N = 5  # circles per side of each grid
 GAP_UM = 500  # spacing between adjacent groups / rows
 MARGIN_UM = 50  # fiducial inset from each tile corner
 FIDUCIAL_SQ_UM = 20  # plus-fiducial square (its bbox is 3x this)
-TILE_GAP_UM = 200  # spacing between tiles
+TILE_GAP_UM = 7000  # spacing between tiles
 TILES = 3  # tile the pattern TILES x TILES
 
-DIE_LABEL = "2026-07-18 electroplating 9-point uniformity test"  # printed on every die
-DIE_TEXT_HEIGHT_UM = 450  # cap height of the die label; the die widens to fit it
+DIE_LABEL_LINES = (  # printed on every die, one text row per line
+    "2026-07-18 electroplating",
+    "9-point uniformity test",
+)
+DIE_TEXT_HEIGHT_UM = 450  # cap height of each label line; the die widens to fit it
+BIG_SQUARE_UM = 2500  # solid square beside the features, to add exposed plating area
 
 
 # --- manual layout ----------------------------------------------------------------
@@ -138,13 +143,18 @@ def build(scale: float) -> Pattern:
         gap,
     )
 
-    core = vstack(line_rows + [circle_row], gap)
+    # the resolution features, with one big solid square beside them for extra plating
+    # area (row-centred by hstack)
+    features = vstack(line_rows + [circle_row], gap)
+    big = box(px(BIG_SQUARE_UM), px(BIG_SQUARE_UM))
+    core = hstack([features, big], gap)
 
-    # a text label on top of each die, sized to a fixed physical cap height. The die
-    # grows in width to fit the (long, single-line) label -- that is what makes the die
-    # bigger, so DIE_TEXT_HEIGHT_UM is the knob for text size.
-    unit_h = text(DIE_LABEL, scale=1).bbox()[3]  # label height at 1 font-px per pixel
-    label = text(DIE_LABEL, scale=max(1, round(px(DIE_TEXT_HEIGHT_UM) / unit_h)))
+    # a two-line text label on top of each die, each line at a fixed physical cap height.
+    # The die grows to fit the label, so DIE_TEXT_HEIGHT_UM is the knob for text size.
+    unit_h = text(DIE_LABEL_LINES[0], scale=1).bbox()[3]  # line height at 1 font-px/px
+    tscale = max(1, round(px(DIE_TEXT_HEIGHT_UM) / unit_h))
+    line_gap = max(1, round(0.4 * tscale * unit_h))  # leading between the two lines
+    label = vstack([text(ln, scale=tscale) for ln in DIE_LABEL_LINES], line_gap)
     content = vstack([label, core], gap)
 
     # frame the content, then drop a plus fiducial in each tile corner
