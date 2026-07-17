@@ -56,13 +56,23 @@ def latest_source_mtime():
 
 
 def run_script():
-    """Run the generation script in a fresh subprocess. Returns (ok, message)."""
+    """Run the generation script in a fresh subprocess. Returns (ok, message).
+
+    The script's stdout/stderr are passed through to our own streams so its print()
+    summary (sizes, diagonal, feature area, ...) shows up live in the terminal.
+    """
     proc = subprocess.run(
         [sys.executable, str(SCRIPT)],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
     )
+    if proc.stdout:
+        sys.stdout.write(proc.stdout)
+        sys.stdout.flush()
+    if proc.stderr:
+        sys.stderr.write(proc.stderr)
+        sys.stderr.flush()
     if proc.returncode == 0:
         return True, "ok"
     msg = (proc.stderr or proc.stdout).strip().splitlines()
