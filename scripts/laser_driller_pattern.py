@@ -63,7 +63,7 @@ CIRCLE_N = 5  # circles per side of each grid
 GAP_UM = 500  # spacing between adjacent groups / rows
 MARGIN_UM = 50  # fiducial inset from each tile corner
 FIDUCIAL_SQ_UM = 20  # plus-fiducial square (its bbox is 3x this)
-TILE_GAP_UM = 7000  # spacing between tiles
+TILE_GAP_UM = 3000  # spacing between tiles
 TILES = 3  # tile the pattern TILES x TILES
 
 DIE_LABEL_LINES = (  # printed on every die, one text row per line
@@ -71,7 +71,8 @@ DIE_LABEL_LINES = (  # printed on every die, one text row per line
     "9-point uniformity test",
 )
 DIE_TEXT_HEIGHT_UM = 450  # cap height of each label line; the die widens to fit it
-BIG_SQUARE_UM = 2500  # solid square beside the features, to add exposed plating area
+DIE_NUM_HEIGHT_UM = 800  # cap height of the per-die id (00..22 for TILES=3)
+BIG_SQUARE_UM = 5000  # solid square beside the features, to add exposed plating area
 
 
 # --- manual layout ----------------------------------------------------------------
@@ -149,30 +150,38 @@ def build(scale: float) -> Pattern:
     big = box(px(BIG_SQUARE_UM), px(BIG_SQUARE_UM))
     core = hstack([features, big], gap)
 
-    # a two-line text label on top of each die, each line at a fixed physical cap height.
-    # The die grows to fit the label, so DIE_TEXT_HEIGHT_UM is the knob for text size.
+    # per-die label: the die id (00..22, read row-col) above the shared two-line label,
+    # each at a fixed physical cap height. The die grows to fit, so DIE_TEXT_HEIGHT_UM /
+    # DIE_NUM_HEIGHT_UM are the text-size knobs.
     unit_h = text(DIE_LABEL_LINES[0], scale=1).bbox()[3]  # line height at 1 font-px/px
     tscale = max(1, round(px(DIE_TEXT_HEIGHT_UM) / unit_h))
-    line_gap = max(1, round(0.4 * tscale * unit_h))  # leading between the two lines
-    label = vstack([text(ln, scale=tscale) for ln in DIE_LABEL_LINES], line_gap)
-    content = vstack([label, core], gap)
+    nscale = max(1, round(px(DIE_NUM_HEIGHT_UM) / unit_h))
+    line_gap = max(1, round(0.4 * tscale * unit_h))  # leading between text lines
+    label_body = vstack([text(ln, scale=tscale) for ln in DIE_LABEL_LINES], line_gap)
 
-    # frame the content, then drop a plus fiducial in each tile corner
     fid_sq = px(FIDUCIAL_SQ_UM)
     fid_span = 3 * fid_sq  # plus_fiducial's bbox is 3x its square
     inset = px(MARGIN_UM)
     pad = inset + fid_span + gap  # keeps the fiducials clear of the content
-
-    cx, cy, cw, ch = content.bbox()
-    tile_w = cw + 2 * pad
-    tile_h = ch + 2 * pad
-
-    tile = ShapeGroup()
-    tile.add(content.translated(pad - cx, pad - cy))
     fid = plus_fiducial(fid_sq)
-    for fx in (inset, tile_w - inset - fid_span):
-        for fy in (inset, tile_h - inset - fid_span):
-            tile.add(fid.translated(fx, fy))
+
+    def make_die(die_id: str):
+        """Frame one die: id line + shared label + features, with corner fiducials."""
+        label = vstack([text(die_id, scale=nscale), label_body], line_gap)
+        content = vstack([label, core], gap)
+        cx, cy, cw, ch = content.bbox()
+        tw, th = cw + 2 * pad, ch + 2 * pad
+        die = ShapeGroup()
+        die.add(content.translated(pad - cx, pad - cy))
+        for fx in (inset, tw - inset - fid_span):
+            for fy in (inset, th - inset - fid_span):
+                die.add(fid.translated(fx, fy))
+        return die, tw, th
+
+    # every die is the same size (its id is always 2 chars); place them in the grid.
+    # id = f"{row}{col}" so the grid reads 00 01 02 / 10 11 12 / 20 21 22.
+    dies = {(i, j): make_die(f"{j}{i}") for i in range(TILES) for j in range(TILES)}
+    tile_w, tile_h = dies[(0, 0)][1], dies[(0, 0)][2]
 
     # canvas is derived from the content: exactly the TILES x TILES grid
     tile_gap = px(TILE_GAP_UM)
@@ -184,9 +193,8 @@ def build(scale: float) -> Pattern:
     if abs(p.px_per_um - scale) > 1e-9:
         raise ValueError(f"scale drifted: {p.px_per_um} != {scale} px/um")
 
-    for i in range(TILES):
-        for j in range(TILES):
-            p.place(tile, i * (tile_w + tile_gap), j * (tile_h + tile_gap))
+    for (i, j), (die, _, _) in dies.items():
+        p.place(die, i * (tile_w + tile_gap), j * (tile_h + tile_gap))
 
     return p
 
