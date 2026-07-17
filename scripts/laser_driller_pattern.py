@@ -38,6 +38,7 @@ from lib import (
     plus_fiducial,
     wafer,
     WAFER_SIZES_MM,
+    text,
     write_gds,
     write_png,
 )
@@ -63,6 +64,9 @@ MARGIN_UM = 50  # fiducial inset from each tile corner
 FIDUCIAL_SQ_UM = 20  # plus-fiducial square (its bbox is 3x this)
 TILE_GAP_UM = 200  # spacing between tiles
 TILES = 3  # tile the pattern TILES x TILES
+
+DIE_LABEL = "2026-07-18 electroplating 9-point uniformity test"  # printed on every die
+DIE_TEXT_HEIGHT_UM = 450  # cap height of the die label; the die widens to fit it
 
 
 # --- manual layout ----------------------------------------------------------------
@@ -134,7 +138,14 @@ def build(scale: float) -> Pattern:
         gap,
     )
 
-    content = vstack(line_rows + [circle_row], gap)
+    core = vstack(line_rows + [circle_row], gap)
+
+    # a text label on top of each die, sized to a fixed physical cap height. The die
+    # grows in width to fit the (long, single-line) label -- that is what makes the die
+    # bigger, so DIE_TEXT_HEIGHT_UM is the knob for text size.
+    unit_h = text(DIE_LABEL, scale=1).bbox()[3]  # label height at 1 font-px per pixel
+    label = text(DIE_LABEL, scale=max(1, round(px(DIE_TEXT_HEIGHT_UM) / unit_h)))
+    content = vstack([label, core], gap)
 
     # frame the content, then drop a plus fiducial in each tile corner
     fid_sq = px(FIDUCIAL_SQ_UM)
