@@ -10,7 +10,7 @@ Defaults:
 
 Edit a builder call, save, and the window updates. Errors in the script are shown in the
 window title and printed; the watcher keeps running. The preview scales to fit the window
-(aspect-preserving, NEAREST so pixels stay crisp) -- resize the window to zoom.
+(aspect-preserving, LANCZOS interpolation) -- resize the window to zoom.
 
 Stdlib + Pillow only (no watchdog). Uses mtime polling.
 """
@@ -116,7 +116,9 @@ class Viewer:
         w, h = self._full_img.size
         scale = min(box_w / w, box_h / h)  # fit inside the window (up- or down-scale)
         new = (max(1, round(w * scale)), max(1, round(h * scale)))
-        img = self._full_img.resize(new, Image.NEAREST)  # NEAREST keeps pixels crisp
+        # LANCZOS interpolates instead of dropping pixels, so heavily-downscaled thin
+        # features (single-px lines, small circles) stay visible instead of aliasing away
+        img = self._full_img.resize(new, Image.LANCZOS)
         self._tk_img = ImageTk.PhotoImage(img)
         self.label.config(image=self._tk_img)
 

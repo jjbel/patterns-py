@@ -205,3 +205,90 @@ def circle_grid(
         for j in range(n):
             out.add(circle(d, intensity=intensity).translated(i * step, j * step))
     return out
+
+
+# Standard wafer sizes: name -> (diameter_mm, flat_length_mm). Primary flat only.
+WAFER_SIZES_MM = {
+    "2inch": (50.8, 15.8),
+    "4inch": (100.0, 32.5),
+}
+
+
+def wafer(
+    diameter: int,
+    flat_length: int,
+    flat_side: str = "bottom",
+    stroke: int = 0,
+    n_segments: int | None = None,
+    intensity: int = 255,
+) -> ShapeGroup:
+    """A wafer outline: a circle of ``diameter`` px with one straight primary flat.
+
+    ``flat_length`` is the chord length of the flat, in px; it must be <= ``diameter``.
+    ``flat_side`` places the flat on the ``"bottom"`` (default), ``"top"``, ``"left"``
+    or ``"right"`` edge.
+
+    ``stroke`` selects the representation:
+      * ``0`` (default) -> a solid filled wafer (single polygon).
+      * ``> 0``         -> a ring outline ``stroke`` px thick, so the wafer can be
+                           overlaid on a pattern without painting over it. The ring is
+                           the boundary scaled inward about the centre, emitted as a
+                           strip of quads (no fill, no seam).
+
+    Top-left of the bbox sits at the local origin, matching the other builders.
+    """
+    if diameter < 1:
+        raise ValueError("diameter must be >= 1 px")
+    r = diameter / 2
+    half = flat_length / 2
+    if not 0 < flat_length <= diameter:
+        raise ValueError("flat_length must be in (0, diameter]")
+    try:
+        base = {
+            "bottom": math.pi / 2,
+            "top": -math.pi / 2,
+            "right": 0.0,
+            "left": math.pi,
+        }[flat_side]
+    except KeyError:
+        raise ValueError(f"flat_side must be bottom/top/left/right, got {flat_side!r}")
+
+    if n_segments is None:
+        n_segments = max(64, math.ceil(math.pi * math.sqrt(r)))
+
+    # The flat is the chord subtending half-angle phi about the centre; keep the major
+    # arc (everything but the flat) and let the closing edge stand in for the flat.
+    phi = math.asin(half / r)
+    e_start = base + phi  # first flat endpoint
+    span = 2 * math.pi - 2 * phi  # major arc swept the long way round
+    outer = [
+        (r * math.cos(e_start + span * i / n_segments),
+         r * math.sin(e_start + span * i / n_segments))
+        for i in range(n_segments + 1)
+    ]
+
+    if stroke <= 0:
+        return ShapeGroup([Polygon(_to_origin(outer), intensity)])
+
+    # Ring: scale the boundary inward about the centre and join with quads. Uniform
+    # scaling keeps every quad convex (the wafer is convex), so there are no artefacts.
+    if stroke >= r:
+        raise ValueError("stroke must be < radius")
+    k = (r - stroke) / r
+    inner = [(x * k, y * k) for x, y in outer]
+    o = _to_origin(outer)  # shared shift so outer/inner stay registered
+    ox, oy = outer[0][0] - o[0][0], outer[0][1] - o[0][1]
+    inn = [(round(x - ox), round(y - oy)) for x, y in inner]
+    quads = [
+        Polygon([o[i], o[(i + 1) % len(o)], inn[(i + 1) % len(inn)], inn[i]], intensity)
+        for i in range(len(o))  # last i wraps once to bridge the two flat endpoints
+    ]
+    return ShapeGroup(quads)
+
+
+def _to_origin(points):
+    """Round float points to int px and shift so the bbox top-left is (0, 0)."""
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    ox, oy = min(xs), min(ys)
+    return [(round(x - ox), round(y - oy)) for x, y in points]

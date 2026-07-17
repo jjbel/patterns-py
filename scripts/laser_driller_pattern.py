@@ -9,12 +9,14 @@ Content of one tile:
   - line arrays: 25/50/100 um widths x pitch 2x/4x x both orientations, 500 um long
   - circle grids: 25/50/75 um diameters at pitch 4x
   - plus fiducials in the 4 corners
-That tile is replicated into a 3x3 grid.
+That tile is replicated into a TILES x TILES grid, and a wafer outline (WAFER_NAME) is
+overlaid at the centre so you can see how the dies sit on the substrate.
 
-OUTPUT: GDS is the real deliverable. At 10 px/um the mask is ~13.4 x 10.1 mm, i.e. a
-13.6 gigapixel raster -- render_rgb alone would need >200 GB of RAM, so a full-scale
-PNG is not writable. GDS is vector and doesn't care. The PNG is therefore re-built at
-PREVIEW_PX_PER_UM purely to eyeball the layout; it is NOT the mask.
+OUTPUT: GDS is the real deliverable. At 10 px/um a 2-inch wafer is 508000 px across, a
+>200 gigapixel raster -- render_rgb alone would need terabytes of RAM, so a full-scale
+PNG is not writable. GDS is vector and doesn't care. The PNG is therefore re-built at a
+reduced scale (whole wafer ~PREVIEW_MAX_PX) purely to eyeball the layout; NOT the mask.
+At that zoom the dies are a small central cluster -- open the GDS to inspect features.
 
 Layout is manual (hstack/vstack, centred rows) rather than flow_layout, whose shelf
 packing top-aligns and reorders.
@@ -34,22 +36,27 @@ from lib import (
     line_array,
     circle_grid,
     plus_fiducial,
+    wafer,
+    WAFER_SIZES_MM,
     write_gds,
     write_png,
 )
 
 # --- knobs (all lengths in MICRONS) ----------------------------------------------
 PX_PER_UM = 10  # projection scale for the mask: 10 px : 1 um
-PREVIEW_PX_PER_UM = 0.4  # scale for the eyeball PNG only (see OUTPUT above)
+PREVIEW_MAX_PX = 2600  # eyeball PNG is scaled so the wafer spans ~this many px
 
-ARRAY_WIDTHS_UM = (25, 50)  # line-array line widths
-PITCH_FACTORS = (2, 4)  # line gap = pitch_factor x line_width (edge-to-edge)
+WAFER_NAME = "2inch"  # substrate outline overlaid at pattern centre; see WAFER_SIZES_MM
+WAFER_STROKE_UM = 50  # ring thickness of the wafer outline
+
+ARRAY_WIDTHS_UM = (25, 50, 75, 100)  # line-array line widths
+PITCH_FACTORS = (2,)  # line gap = pitch_factor x line_width (edge-to-edge)
 N_LINES = 5  # lines per array
 LINE_LEN_UM = 500  # long dimension of every line
 
-CIRCLE_DIAMS_UM = (25, 50, 75)  # circle-grid diameters
-CIRCLE_PITCH_FACTOR = 2  # circle gap = 4 x diameter (edge-to-edge)
-CIRCLE_N = 8  # circles per side of each grid
+CIRCLE_DIAMS_UM = (25, 50, 75, 100)  # circle-grid diameters
+CIRCLE_PITCH_FACTOR = 1  # circle gap = this x diameter (edge-to-edge)
+CIRCLE_N = 5  # circles per side of each grid
 
 GAP_UM = 500  # spacing between adjacent groups / rows
 MARGIN_UM = 50  # fiducial inset from each tile corner
@@ -110,7 +117,8 @@ def build(scale: float) -> Pattern:
                     length=px(LINE_LEN_UM),
                 )
                 for w in ARRAY_WIDTHS_UM
-                for o in ("h", "v")
+                # for o in ("h", "v")
+                for o in ("h")
             ],
             gap,
         )
@@ -162,7 +170,33 @@ def build(scale: float) -> Pattern:
     return p
 
 
-mask = build(PX_PER_UM)
+def compose(scale: float) -> Pattern:
+    """Build the die grid and overlay the wafer outline, both centred on one canvas.
+
+    The wafer is far larger than the die grid, so the canvas grows to whichever is
+    bigger and both are centred in it. The wafer is drawn as a ring (stroke), not a
+    filled disk, so it frames the dies instead of painting over them.
+    """
+    dies = ShapeGroup(build(scale).shapes)
+    dx, dy, dw, dh = dies.bbox()
+    dies = dies.translated(-dx, -dy)  # normalise to origin before re-centring
+
+    diam_mm, flat_mm = WAFER_SIZES_MM[WAFER_NAME]
+    ring = wafer(
+        round(diam_mm * 1000 * scale),
+        round(flat_mm * 1000 * scale),
+        stroke=max(1, round(WAFER_STROKE_UM * scale)),
+    )
+    _, _, ww, wh = ring.bbox()
+
+    w, h = max(dw, ww), max(dh, wh)
+    p = Pattern("laser_driller_pattern", field_um=w / scale, width_px=w, height_px=h)
+    p.place(ring, (w - ww) // 2, (h - wh) // 2)
+    p.place(dies, (w - dw) // 2, (h - dh) // 2)
+    return p
+
+
+mask = compose(PX_PER_UM)
 geom = ShapeGroup(mask.shapes)  # wrap so the new diagonal()/area() helpers are usable
 diag_um = geom.diagonal() / PX_PER_UM
 area_um2 = geom.area() / PX_PER_UM**2  # px -> um^2 (divide by px/um squared)
@@ -172,12 +206,16 @@ print(
     f"({mask.width_px / PX_PER_UM:g} x {mask.height_px / PX_PER_UM:g} um)  "
     f"= {mask.width_px * mask.height_px / 1e9:.2f} Gpx"
 )
+print(f"wafer:   {WAFER_NAME} ({WAFER_SIZES_MM[WAFER_NAME][0]} mm dia)")
 print(f"shapes:  {len(mask.shapes)}")
 print(f"diag:    {diag_um:.0f} um  ({diag_um / 1000:.2f} mm)")
 print(f"feature: {area_um2 / 1e6:.3f} mm^2 exposed  ({fill:.2%} fill)")
 write_gds(mask, OUT / "laser_driller_pattern.gds")
 
-# preview only -- a full-scale PNG is not writable (see OUTPUT in the module docstring)
-pv = build(PREVIEW_PX_PER_UM)
-print(f"preview: {pv.width_px} x {pv.height_px} px @ {PREVIEW_PX_PER_UM} px/um")
+# preview only -- a full-scale PNG is not writable (see OUTPUT in the module docstring).
+# Scale so the whole wafer spans ~PREVIEW_MAX_PX; at that zoom the dies are a small
+# central cluster (the wafer is ~5x wider than the pattern).
+preview_scale = PREVIEW_MAX_PX / (WAFER_SIZES_MM[WAFER_NAME][0] * 1000)
+pv = compose(preview_scale)
+print(f"preview: {pv.width_px} x {pv.height_px} px @ {preview_scale:.4f} px/um")
 write_png(pv, OUT / "laser_driller_pattern_preview.png", "white")

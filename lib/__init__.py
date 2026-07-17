@@ -14,6 +14,8 @@ from .builders import (
     nested_ls,
     circle,
     circle_grid,
+    wafer,
+    WAFER_SIZES_MM,
 )
 from .text import text
 from .layout import flow_layout, tile_quadrants
@@ -34,6 +36,8 @@ __all__ = [
     "nested_ls",
     "circle",
     "circle_grid",
+    "wafer",
+    "WAFER_SIZES_MM",
     "text",
     "flow_layout",
     "tile_quadrants",
