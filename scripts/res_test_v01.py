@@ -25,24 +25,20 @@ from lib import (
 )
 
 # --- knobs -----------------------------------------------------------------------
-MAX_W = 3600          # wrap width for the top-level block flow
-GAP = 60              # spacing between blocks / packed arrays
-MARGIN = 40           # fiducial inset from each canvas corner
-FIDUCIAL_SQ = 30      # plus-fiducial square size (bbox is 3x this)
-DIGIT_SCALE = 12      # font pixel-scale for the 0-9 digit strip
-L_LINE_WIDTHS = [4, 16, 35]   # nested-L line widths (px)
-ARRAY_WIDTHS = (16, 35)       # line-array widths (px); pitch = 4 x line_width
-OUT_STEM = "l_test"           # output file stem (also what live_reload.py watches)
+MAX_W = 3600  # wrap width for the top-level block flow
+GAP = 120  # spacing between blocks / packed arrays
+MARGIN = 40  # fiducial inset from each canvas corner
+FIDUCIAL_SQ = 60  # plus-fiducial square size (bbox is 3x this)
+L_LINE_WIDTHS = [4, 17, 35]  # nested-L line widths (px)
+ARRAY_WIDTHS = (17, 23, 29, 35)  # line-array widths (px); pitch = 4 x line_width
+OUT_STEM = "res_test_v01"  # output file stem (also what live_reload.py watches)
 
 p = Pattern("res_test_v01")
 
 # block 1: nested L's (one per line width) -- kept as a single block
 l_block = nested_ls(n=5, line_widths=L_LINE_WIDTHS)
 
-# block 2: digits 0-9 as one strip
-digit_block = text("0123456789", scale=DIGIT_SCALE)
-
-# block 3: line arrays, pitch = 4 x line_width, both orientations, at each width
+# block 2: line arrays, pitch = 4 x line_width, both orientations, at each width
 line_groups = [
     line_array(w, n_lines=4, pitch_factor=4, orientation=o)
     for w in ARRAY_WIDTHS
@@ -52,7 +48,7 @@ line_block = flow_layout(line_groups, max_width=1200, gap=GAP)
 
 # pack the three blocks (each kept whole, order preserved)
 block = flow_layout(
-    [l_block, digit_block, line_block], max_width=MAX_W, gap=GAP, sort_by_height=False
+    [l_block, line_block], max_width=MAX_W, gap=GAP, sort_by_height=False
 )
 
 # centre the combined block on the field
@@ -68,8 +64,7 @@ for fx in (MARGIN, p.width_px - MARGIN - fw):
 
 print(f"combined block bbox: {bw} x {bh} px")
 
-write_gds(p, OUT / f"{OUT_STEM}.gds")
-for c in ("white", "red", "blue"):
+# write_gds(p, OUT / f"{OUT_STEM}.gds")
+# for c in ("white", "red", "blue"):
+for c in "white":
     write_png(p, OUT / f"{OUT_STEM}_{c}.png", c)
-
-print(f"wrote {OUT / f'{OUT_STEM}.gds'} and {OUT_STEM}_[white|red|blue].png")
