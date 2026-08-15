@@ -220,7 +220,7 @@ def compose(scale: float) -> Pattern:
 
     w, h = max(dw, ww), max(dh, wh)
     p = Pattern("laser_driller_pattern", field_um=w / scale, width_px=w, height_px=h)
-    p.place(ring, (w - ww) // 2, (h - wh) // 2)
+    # p.place(ring, (w - ww) // 2, (h - wh) // 2)
     p.place(dies, (w - dw) // 2, (h - dh) // 2)
     return p
 
@@ -239,7 +239,7 @@ print(f"wafer:   {WAFER_NAME} ({WAFER_SIZES_MM[WAFER_NAME][0]} mm dia)")
 print(f"shapes:  {len(mask.shapes)}")
 print(f"diag:    {diag_um:.0f} um  ({diag_um / 1000:.2f} mm)")
 print(f"feature: {area_um2 / 1e6:.3f} mm^2 exposed  ({fill:.2%} fill)")
-write_gds(mask, OUT / "laser_driller_pattern.gds")
+write_gds(mask, OUT / "electroplating_pattern.gds")
 
 # preview only -- a full-scale PNG is not writable (see OUTPUT in the module docstring).
 # Scale so the whole wafer spans ~PREVIEW_MAX_PX; at that zoom the dies are a small
@@ -247,4 +247,4 @@ write_gds(mask, OUT / "laser_driller_pattern.gds")
 preview_scale = PREVIEW_MAX_PX / (WAFER_SIZES_MM[WAFER_NAME][0] * 1000)
 pv = compose(preview_scale)
 print(f"preview: {pv.width_px} x {pv.height_px} px @ {preview_scale:.4f} px/um")
-write_png(pv, OUT / "laser_driller_pattern_preview.png", "white")
+write_png(pv, OUT / "electroplating_pattern_preview.png", "white")
