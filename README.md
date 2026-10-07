@@ -31,7 +31,8 @@ python scripts/make_resolution_test.py # full test pattern, tiled into 4 quadran
 python scripts/live_reload.py          # watch sources, re-run, live preview window
 ```
 
-Outputs land in `out/` (gitignored): a `.gds` plus `_white.png`, `_red.png`, `_blue.png`.
+Outputs land in `out/` (gitignored): a `.gds` (plus a matching `.cif`) and
+`_white.png`, `_red.png`, `_blue.png`.
 
 ### As a library
 
@@ -68,8 +69,10 @@ for c in ("white", "red", "blue"):
   `scene.py` — `Pattern`, `Box`, `Polygon`, `ShapeGroup`, µm↔px scale
   `builders.py` — `box`, `line_array`, `checkerboard`, `plus_fiducial`
   `layout.py` — `flow_layout` (shelf packer), `tile_quadrants`
-  `gds.py` — `write_gds`
+  `gds.py` — `write_gds` (also emits a `.cif` beside the GDS via KLayout's `strm2cif`;
+    pass `cif=False` to skip it, or call `write_cif` on an existing GDS)
   `raster.py` — `render_intensity`, `render_rgb`, `write_png`
   `preview.py` — `preview`
   `_bootstrap.py` — `ROOT` / `OUT` paths for scripts
-`scripts/` — `make_box.py`, `make_resolution_test.py` (test block built inline here), `live_reload.py`
+`scripts/` — `make_box.py`, `make_resolution_test.py` (test block built inline here),
+  `step_test.py` (4x 100 µm squares on the corners of a 9 mm square), `live_reload.py`

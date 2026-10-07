@@ -19,7 +19,7 @@ from .builders import (
 )
 from .text import text
 from .layout import flow_layout, tile_quadrants
-from .gds import write_gds
+from .gds import write_gds, write_cif
 from .raster import render_intensity, render_rgb, write_png, COLORS
 from .preview import preview
 
@@ -42,6 +42,7 @@ __all__ = [
     "flow_layout",
     "tile_quadrants",
     "write_gds",
+    "write_cif",
     "render_intensity",
     "render_rgb",
     "write_png",
